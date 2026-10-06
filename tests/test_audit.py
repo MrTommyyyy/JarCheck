@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from jarcheck import audit, summary
+from jarcheck import audit, save_report, summary
 
 
 class AuditTests(unittest.TestCase):
@@ -77,6 +77,68 @@ class AuditTests(unittest.TestCase):
     def test_missing_folder(self):
         with self.assertRaises(ValueError):
             audit(self.folder / "missing")
+
+    def test_recursive_uses_relative_paths_and_is_opt_in(self):
+        first = self.jar("a.jar")
+        nested = self.folder / "nested"
+        nested.mkdir()
+        shutil.copyfile(first, nested / "renamed.jar")
+        self.assertEqual(len(audit(self.folder)["files"]), 1)
+        report = audit(self.folder, recursive=True)
+        self.assertEqual(report["identical_groups"], [["a.jar", "nested/renamed.jar"]])
+        self.assertTrue(report["recursive"])
+
+    def test_symbolic_links_are_not_followed(self):
+        with tempfile.TemporaryDirectory() as outside:
+            target = Path(outside) / "external.jar"
+            target.write_bytes(b"not an archive")
+            try:
+                (self.folder / "link.jar").symlink_to(target)
+                (self.folder / "directory").symlink_to(outside, target_is_directory=True)
+            except OSError:
+                self.skipTest("Symbolic link creation is unavailable")
+            report = audit(self.folder, recursive=True)
+            self.assertEqual(report["files"], [{"name": "link.jar", "status": "skipped", "detail": "Symbolic links are not scanned."}])
+
+    def test_safe_report_export_and_failed_write_preserves_previous_report(self):
+        jar = self.jar("a.jar")
+        original = jar.read_bytes()
+        report = audit(self.folder)
+        with self.assertRaises(ValueError):
+            save_report(report, jar)
+        self.assertEqual(jar.read_bytes(), original)
+        output = self.folder / "report.json"
+        save_report(report, output)
+        self.assertEqual(json.loads(output.read_text()), report)
+        before = output.read_bytes()
+        with patch("jarcheck.json.dump", side_effect=ValueError("cannot encode")):
+            with self.assertRaises(ValueError):
+                save_report(report, output)
+        self.assertEqual(output.read_bytes(), before)
+        self.assertEqual(list(self.folder.glob(".jarcheck-*.tmp")), [])
+
+    def test_report_output_rejects_symbolic_link(self):
+        target = self.folder / "target.jar"
+        target.write_bytes(b"original")
+        link = self.folder / "report.json"
+        try:
+            link.symlink_to(target)
+        except OSError:
+            self.skipTest("Symbolic link creation is unavailable")
+        with self.assertRaises(ValueError):
+            save_report(audit(self.folder), link)
+        self.assertEqual(target.read_bytes(), b"original")
+
+    def test_cli_recursive_and_output(self):
+        self.jar("a.jar")
+        (self.folder / "nested").mkdir()
+        shutil.copyfile(self.folder / "a.jar", self.folder / "nested" / "b.jar")
+        script = Path(__file__).resolve().parents[1] / "jarcheck.py"
+        output = self.folder / "report.json"
+        command = [sys.executable, str(script), str(self.folder), "--recursive", "--output", str(output)]
+        result = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(json.loads(output.read_text())["identical_groups"], [["a.jar", "nested/b.jar"]])
 
     def test_cli_json_and_exit_codes(self):
         script = Path(__file__).resolve().parents[1] / "jarcheck.py"

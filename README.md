@@ -2,7 +2,26 @@
 
 A small, offline Minecraft mod-folder checker. It finds **byte-for-byte identical JARs**, even when their names differ, and validates ZIP/JAR integrity. It never deletes, edits, or executes mods. No API key, subscription, or external Python packages required.
 
-Version: 0.1.0. This is a new, AI-assisted starter project. It has no claimed users, downloads, external contributors, or established adoption.
+Version: 0.1.1. This project is at an early stage.
+
+## Why I'm building this
+
+I enjoy modded Minecraft and want tools that make managing modpacks less frustrating. JarCheck focuses on a small but useful job: spotting accidental copies and damaged JARs without changing anyone's files. I want it to stay simple enough for beginners and useful enough to grow through real feedback.
+
+## What's included
+
+- A desktop window and a command-line interface.
+- SHA-256 matching to find identical files with different names.
+- Archive integrity checks with limits on large archives.
+- JSON reports you can save and review.
+- Checks for files that change during a scan.
+- Automated tests on Windows, macOS, and Linux.
+
+## Changes in 0.1.1
+
+- Fixed a case where a JAR changed after hashing but could still be reported as an identical copy. Changed files are now flagged and excluded from duplicate groups.
+- Added a regression test that changes a JAR during a scan.
+- Added a clearer message when the selected folder has no JARs.
 
 ## Start on Windows
 
@@ -30,20 +49,11 @@ Use `python3` instead of `python` if your system requires it. Exit codes: `0` = 
 - **INVALID:** the archive could not be validated, including malformed, encrypted, or unsupported ZIPs. This is not proof of malware.
 - **UNREADABLE:** an operating-system error prevented access.
 - **UNCHECKED:** validation was skipped because an archive has more than 10,000 entries or over 128 MiB of declared uncompressed content. Its SHA-256 was still computed.
+- **CHANGED:** the file's size, modification time, or identity changed during the scan, or it disappeared. Close the launcher and run the scan again. This is a best-effort check, not a locked filesystem snapshot.
 
 Only top-level `.jar` files are scanned. A clean result **does not** prove mods are compatible, dependencies are present, versions match, or files are safe. Different versions of the same mod will normally have different contents and are not flagged as identical. Close Minecraft and avoid changing the folder during a scan.
 
 Reports contain filenames, hashes, status, and error details. Error messages can contain local paths; review reports before posting publicly. The program makes no network requests.
-
-## Publish the source on GitHub
-
-1. Sign in at https://github.com and create a new **public** repository named `jarcheck`.
-2. Choose **uploading an existing file** (or **Add file → Upload files**).
-3. Upload the extracted source files, including `README.md`, `LICENSE`, `jarcheck.py`, `gui.py`, and the `tests` folder; commit them. Upload the source, not only the ZIP.
-4. If using Git, also include `.github/workflows/tests.yml` to enable the included automated checks. Browser uploads may omit hidden folders.
-5. Read the code, try it with your own mod folder, and keep improving it as the maintainer.
-
-Creating this repository does not establish eligibility for Anthropic's Claude for Open Source program. Its published criteria focus on existing adoption, contributions, or critical infrastructure: https://claude.com/contact-sales/claude-for-oss . Do not claim activity or adoption that has not happened.
 
 ## Development
 

@@ -8,7 +8,7 @@ import zipfile
 from collections import defaultdict
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 MAX_UNPACKED_BYTES = 128 * 1024 * 1024
 MAX_ENTRIES = 10_000
 
@@ -25,24 +25,37 @@ def audit(folder: str | Path) -> dict:
             continue
         record = {"name": path.name, "status": "ok", "detail": ""}
         records.append(record)
+        before = None
+        digest = None
         try:
+            before = path.stat()
             with path.open("rb") as stream:
                 digest = hashlib.file_digest(stream, "sha256").hexdigest()
             record["sha256"] = digest
-            hashes[digest].append(path.name)
             with zipfile.ZipFile(path) as archive:
                 entries = archive.infolist()
                 if len(entries) > MAX_ENTRIES or sum(e.file_size for e in entries) > MAX_UNPACKED_BYTES:
                     record.update(status="unchecked", detail="Archive exceeds validation limits; CRC check skipped.")
-                    continue
-                bad_member = archive.testzip()
-                if bad_member is not None:
-                    record.update(status="damaged", detail=f"CRC check failed: {bad_member}")
+                else:
+                    bad_member = archive.testzip()
+                    if bad_member is not None:
+                        record.update(status="damaged", detail=f"CRC check failed: {bad_member}")
         except OSError as exc:
             record.update(status="unreadable", detail=str(exc))
         except Exception as exc:
             # Unsupported/encrypted ZIPs and malformed archives remain findings.
             record.update(status="invalid", detail=f"Could not validate as JAR/ZIP: {type(exc).__name__}: {exc}")
+        if before is not None:
+            try:
+                after = path.stat()
+                changed = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+            except OSError:
+                changed = True
+            if changed:
+                record.update(status="changed", detail="File changed or disappeared during the scan. Run the scan again when the folder is idle.")
+                record.pop("sha256", None)
+            elif digest is not None:
+                hashes[digest].append(path.name)
     return {
         "tool": "JarCheck", "version": VERSION,
         "files": records,
@@ -58,7 +71,9 @@ def summary(report: dict) -> str:
     for item in report["files"]:
         if item["status"] != "ok":
             lines.append(f"{item['status'].upper()}: {item['name']} — {item['detail']}")
-    if not report["identical_groups"] and all(r["status"] == "ok" for r in report["files"]):
+    if not report["files"]:
+        lines.append("No JAR files found. Check that you selected the instance's mods folder.")
+    elif not report["identical_groups"] and all(r["status"] == "ok" for r in report["files"]):
         lines.append("No identical JARs or archive integrity problems detected.")
     lines.append("This does not check mod compatibility, dependencies, or malware.")
     return "\n".join(lines)

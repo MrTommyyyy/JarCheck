@@ -1,3 +1,4 @@
+import hashlib
 import json
 import shutil
 import subprocess
@@ -35,6 +36,24 @@ class AuditTests(unittest.TestCase):
         self.jar("b.jar", b"b")
         self.assertEqual(audit(self.folder)["identical_groups"], [])
 
+    def test_changing_file_not_reported_as_identical(self):
+        first = self.jar("a.jar")
+        shutil.copyfile(first, self.folder / "b.jar")
+        real_digest = hashlib.file_digest
+
+        def digest_then_change(stream, algorithm):
+            result = real_digest(stream, algorithm)
+            if Path(stream.name).name == "a.jar":
+                with first.open("ab") as target:
+                    target.write(b"changed during scan")
+            return result
+
+        with patch("jarcheck.hashlib.file_digest", side_effect=digest_then_change):
+            report = audit(self.folder)
+        self.assertEqual(report["files"][0]["status"], "changed")
+        self.assertNotIn("sha256", report["files"][0])
+        self.assertEqual(report["identical_groups"], [])
+
     def test_invalid_and_crc_damaged(self):
         (self.folder / "invalid.jar").write_bytes(b"not a ZIP")
         damaged = self.jar("damaged.jar", b"unique-payload")
@@ -53,6 +72,7 @@ class AuditTests(unittest.TestCase):
         (self.folder / "nested.jar").mkdir()
         self.assertEqual(audit(self.folder)["files"], [])
         self.assertIn("0 JAR", summary(audit(self.folder)))
+        self.assertIn("No JAR files found", summary(audit(self.folder)))
 
     def test_missing_folder(self):
         with self.assertRaises(ValueError):

@@ -4,26 +4,45 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import tempfile
 import zipfile
 from collections import defaultdict
 from pathlib import Path
 
-VERSION = "0.1.1"
+VERSION = "0.2.0"
 MAX_UNPACKED_BYTES = 128 * 1024 * 1024
 MAX_ENTRIES = 10_000
 
 
-def audit(folder: str | Path) -> dict:
-    """Inspect top-level JARs; never modify them or execute their contents."""
+def audit(folder: str | Path, *, recursive: bool = False) -> dict:
+    """Inspect JARs without changing them. Never follow symbolic links."""
     folder = Path(folder)
     if not folder.is_dir():
         raise ValueError("Choose an existing folder.")
     records = []
     hashes = defaultdict(list)
-    for path in sorted(folder.iterdir(), key=lambda p: p.name.casefold()):
-        if not path.is_file() or path.suffix.lower() != ".jar":
+    def candidates():
+        if not recursive:
+            yield from folder.iterdir()
+            return
+        def walk_error(exc):
+            raise exc
+        for parent, directories, names in os.walk(folder, followlinks=False, onerror=walk_error):
+            directories[:] = [name for name in directories if not (Path(parent) / name).is_symlink()]
+            for name in names:
+                yield Path(parent) / name
+
+    for path in sorted(candidates(), key=lambda p: (p.relative_to(folder).as_posix().casefold(), p.relative_to(folder).as_posix())):
+        if path.suffix.lower() != ".jar":
             continue
-        record = {"name": path.name, "status": "ok", "detail": ""}
+        name = path.relative_to(folder).as_posix()
+        if path.is_symlink():
+            records.append({"name": name, "status": "skipped", "detail": "Symbolic links are not scanned."})
+            continue
+        if not path.is_file():
+            continue
+        record = {"name": name, "status": "ok", "detail": ""}
         records.append(record)
         before = None
         digest = None
@@ -55,13 +74,32 @@ def audit(folder: str | Path) -> dict:
                 record.update(status="changed", detail="File changed or disappeared during the scan. Run the scan again when the folder is idle.")
                 record.pop("sha256", None)
             elif digest is not None:
-                hashes[digest].append(path.name)
+                hashes[digest].append(name)
     return {
         "tool": "JarCheck", "version": VERSION,
-        "files": records,
+        "files": records, "recursive": recursive,
         "identical_groups": [names for names in hashes.values() if len(names) > 1],
         "limits": {"max_unpacked_bytes": MAX_UNPACKED_BYTES, "max_entries": MAX_ENTRIES},
     }
+
+
+def save_report(report: dict, output: str | Path) -> None:
+    """Atomically save JSON, refusing other extensions and symbolic links."""
+    output = Path(output)
+    if output.suffix.lower() != ".json":
+        raise ValueError("Save reports as .json files; mod files cannot be used as report output.")
+    if output.is_symlink():
+        raise ValueError("Report output must not be a symbolic link.")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=output.parent, prefix=".jarcheck-", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            json.dump(report, stream, indent=2, ensure_ascii=False)
+            stream.write("\n")
+        os.replace(temporary, output)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def summary(report: dict) -> str:
@@ -83,10 +121,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("folder", type=Path, help="Minecraft mods folder (top-level JARs only)")
     parser.add_argument("--json", action="store_true", help="Print a JSON report")
+    parser.add_argument("--recursive", action="store_true", help="Include nested folders without following symbolic links")
+    parser.add_argument("--output", type=Path, help="Save a JSON report to a .json file (replaces an existing report)")
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
     try:
-        report = audit(args.folder)
+        report = audit(args.folder, recursive=args.recursive)
+        if args.output:
+            save_report(report, args.output)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     print(json.dumps(report, indent=2) if args.json else summary(report))

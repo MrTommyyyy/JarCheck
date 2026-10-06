@@ -1,22 +1,24 @@
 """Desktop interface for JarCheck; no network access or third-party packages."""
-import json
 import queue
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 
-from jarcheck import audit, summary
+from jarcheck import VERSION, audit, save_report, summary
 
 
 def main():
     root = tk.Tk()
-    root.title("JarCheck — Minecraft mod folder checker")
+    root.title(f"JarCheck {VERSION} — Minecraft mod folder checker")
     root.geometry("780x500")
     root.minsize(540, 340)
     tk.Label(root, text="JarCheck", font=("Segoe UI", 22, "bold")).pack(pady=(16, 4))
     tk.Label(root, text="Find identical JARs and damaged archives. Your files stay on your computer.").pack(padx=12)
     controls = tk.Frame(root)
     controls.pack(pady=12)
+    recursive = tk.BooleanVar(value=False)
+    recursive_toggle = tk.Checkbutton(root, text="Include subfolders (symbolic links are skipped)", variable=recursive)
+    recursive_toggle.pack(pady=(0, 8))
     output = scrolledtext.ScrolledText(root, wrap=tk.WORD, font=("Consolas", 10))
     output.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 16))
     output.insert(tk.END, "Choose your Minecraft mods folder to begin.\n\nNo files are changed or deleted.")
@@ -36,12 +38,14 @@ def main():
             return
         scan.configure(state=tk.DISABLED)
         save.configure(state=tk.DISABLED)
+        recursive_toggle.configure(state=tk.DISABLED)
+        include_nested = recursive.get()
         state["report"] = None
         display("Checking JARs…")
 
         def worker():
             try:
-                results.put((audit(folder), None))
+                results.put((audit(folder, recursive=include_nested), None))
             except Exception as exc:
                 results.put((None, str(exc)))
         threading.Thread(target=worker, daemon=True).start()
@@ -54,6 +58,7 @@ def main():
             root.after(100, poll)
             return
         scan.configure(state=tk.NORMAL)
+        recursive_toggle.configure(state=tk.NORMAL)
         if error:
             display("Could not complete scan: " + error)
             return
@@ -66,9 +71,8 @@ def main():
         if not path:
             return
         try:
-            with open(path, "w", encoding="utf-8") as stream:
-                json.dump(state["report"], stream, indent=2)
-        except OSError as exc:
+            save_report(state["report"], path)
+        except (ValueError, OSError) as exc:
             messagebox.showerror("Save failed", str(exc))
 
     scan = tk.Button(controls, text="Choose mods folder", command=choose, padx=12)

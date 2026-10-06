@@ -5,8 +5,7 @@ Try the tool on a copied mod folder first. Submit reproducible bugs, documentati
 Useful next tasks:
 
 - Manually test the desktop interface on Windows, macOS, and Linux.
-- Add an optional recursive scan with clear handling of symlinks.
 - Explore detecting multiple versions of the same mod using documented loader metadata; distinguish these from identical files.
-- Add sample report screenshots using invented filenames.
+- Try `python demo.py` and suggest ways to make findings easier to understand.
 
 Run `python -m unittest discover -s tests -v` before submitting a change. Keep scanning read-only and offline, and avoid claiming a clean scan guarantees compatibility or security.

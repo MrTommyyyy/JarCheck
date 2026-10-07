@@ -1,10 +1,13 @@
 """Exercise actual Tk widgets; native file/dialog responses use disposable inputs.
 
-Requires a desktop display. Windows CI runs these; headless machines skip them.
+Windows CI runs these. On another desktop set JARCHECK_GUI_TESTS=1 explicitly;
+hosted macOS runners can crash in native Tk modal-window code.
 """
 import json
+import os
 import shutil
 import tempfile
+import sys
 import time
 import tkinter as tk
 import unittest
@@ -16,6 +19,7 @@ from gui import JarCheckApp
 from jarcheck import VERSION
 
 
+@unittest.skipUnless(sys.platform == "win32" or os.environ.get("JARCHECK_GUI_TESTS") == "1", "Desktop checks run on Windows; use JARCHECK_GUI_TESTS=1 on another desktop")
 class DesktopTests(unittest.TestCase):
     def setUp(self):
         try:

@@ -1,8 +1,8 @@
 # JarCheck
 
-A small, offline Minecraft mod-folder checker. It finds **byte-for-byte identical JARs**, even when their names differ, and validates ZIP/JAR integrity. It never deletes, edits, or executes mods. No API key, subscription, or external Python packages required.
+A small, offline Minecraft mod-folder checker. It finds **byte-for-byte identical JARs**, even when their names differ, and validates ZIP/JAR integrity. Scanning never changes or executes mods. Optional duplicate cleanup moves extra copies out of your mods folder into a recoverable backup; it does not permanently delete them. No API key, subscription, or external Python packages required.
 
-Version: **0.3.0**. This project is at an early stage.
+Version: **0.4.0**. This project is at an early stage.
 
 [Download the latest release](https://github.com/MrTommyyyy/JarCheck/releases/latest) · [Report a bug](https://github.com/MrTommyyyy/JarCheck/issues/new?template=bug_report.md) · [Suggest an improvement](https://github.com/MrTommyyyy/JarCheck/issues/new?template=feature_request.md)
 
@@ -12,7 +12,7 @@ Version: **0.3.0**. This project is at an early stage.
 
 ## Why I'm building this
 
-I enjoy modded Minecraft and want tools that make managing modpacks less frustrating. JarCheck focuses on a small but useful job: spotting accidental copies and damaged JARs without changing anyone's files. I want it to stay simple enough for beginners and useful enough to grow through real feedback.
+I enjoy modded Minecraft and want tools that make managing modpacks less frustrating. JarCheck focuses on a small but useful job: spotting accidental copies and damaged JARs, then giving people a clear choice about moving duplicates. I want it to stay simple enough for beginners and useful enough to grow through real feedback.
 
 ## What's included
 
@@ -24,6 +24,15 @@ I enjoy modded Minecraft and want tools that make managing modpacks less frustra
 - Automated tests on Windows, macOS, and Linux.
 - Optional subfolder scanning with relative paths; symbolic links are skipped.
 - Safe JSON exports from the terminal or desktop window.
+
+## Changes in 0.4.0
+
+- **Review duplicates** previews each group and lets you choose the JAR to keep.
+- Extra healthy copies move to a sibling `JarCheck-Recovery` folder with a restore record.
+- **Restore recovery folder** puts files back without overwriting existing files.
+- Files are hashed again before moving; changed files stop cleanup.
+- Cleanup and restoration run in the background so the window remains responsive.
+- Nine cleanup regression tests and four tests that exercise the actual desktop widgets on Windows.
 
 ## Changes in 0.3.0
 
@@ -47,7 +56,7 @@ I enjoy modded Minecraft and want tools that make managing modpacks less frustra
 3. Double-click `START-WINDOWS.bat`.
 4. Click **Choose mods folder** and select your Minecraft instance's `mods` folder.
 
-The standard Windows Python installer normally includes Tkinter for the desktop window. On systems without Tkinter, use the command line below. Linux desktop users may need their distribution's Tkinter package. This release's scanner was tested automatically; the desktop interface still needs manual testing on Windows.
+The standard Windows Python installer normally includes Tkinter for the desktop window. On systems without Tkinter, use the command line below. Linux desktop users may need their distribution's Tkinter package. Windows CI exercises the desktop widgets with synthetic JARs and mocked file-dialog responses, and checks that the bundled desktop executable opens. Those are automated checks; try a backed-up copy of your own pack before using cleanup on it.
 
 ## Command line
 
@@ -61,6 +70,24 @@ python gui.py
 Use `python3` instead of `python` if your system requires it. Exit codes: `0` = scan completed without findings, `1` = duplicate or validation finding, `2` = invalid input or folder access failure.
 
 Report output must end in `.json` and must not be a symbolic link. Saving to an existing report replaces that report. The desktop window has an **Include subfolders** checkbox; it is off by default.
+
+## Remove identical copies and restore them
+
+1. Close Minecraft and your launcher, then scan your mods folder.
+2. Click **Review duplicates…**. Choose one filename to keep per identical group.
+3. Confirm **Move extra copies to recovery**. JarCheck rechecks hashes, moves the extras and rescans.
+4. To undo, click **Restore recovery folder…** and select the specific backup folder containing `recovery.json`.
+
+Only healthy byte-identical JARs are eligible. Different versions, damaged files and archives exceeding the validation limits are left alone. Recovery is created beside your mods folder, not inside it; the parent folder must be writable. No files are permanently deleted. Restoration refuses existing destination files instead of replacing them.
+
+Terminal equivalents:
+
+```sh
+python jarcheck.py "C:\path\to\mods" --quarantine-duplicates --json
+python jarcheck.py --restore "C:\path\to\JarCheck-Recovery\mods-example"
+```
+
+The CLI keeps the first filename in the scan's sorted order; use the desktop preview to choose a different copy. Keep the recovery folder until you are satisfied with the result. Its record contains your original absolute folder path, so review it before sharing. Cleanup is a best-effort idle-folder operation, not a transaction or a filesystem lock. If moving fails partway through, the error names the recovery folder and its record can restore files already moved. Filesystem permissions, a running launcher or unsupported hard links can stop a restore; backups remain available for a manual copy.
 
 ## Try it without your mods
 

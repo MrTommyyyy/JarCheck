@@ -1,15 +1,9 @@
-## What changed
+JarCheck 0.4.0 adds duplicate cleanup with a preview and recovery.
 
-- Added a portable Windows desktop app (`JarCheck.exe`) and terminal scanner (`JarCheck-CLI.exe`).
-- Shows scan progress and the current filename.
-- Added a copy-results button.
+Choose a copy to keep from each healthy identical group. Extra copies move to a sibling JarCheck-Recovery folder; Restore recovery folder puts them back without overwriting existing files. Hashes are rechecked before moves, and a recovery record is preserved if cleanup stops partway through.
 
-## Download
+Windows users: extract JarCheck-0.4.0-Windows-x64.zip and open JarCheck.exe. JarCheck-CLI.exe is included. Python is bundled. Source users need Python 3.11+.
 
-Extract the Windows ZIP and double-click `JarCheck.exe`. No separate Python installation required.
+Scanning remains read-only; cleanup needs explicit confirmation. Close Minecraft and your launcher first. This does not determine mod compatibility or malware safety.
 
-Choose `JarCheck-0.3.0-Windows-x64.zip` for 64-bit Windows or `JarCheck-0.3.0-Source.zip` for Python 3.11+ on Windows, macOS or Linux. The Windows ZIP includes executable SHA-256 hashes and the MIT licence.
-
-## Validation
-
-Source regression tests and packaged executable behaviour checks run on the Windows build before publishing. The JarCheck desktop interaction still needs manual testing; no claim is made that every desktop configuration has been tested.
+Validation: 24 core tests and four actual Tk interface tests, plus packaged CLI behaviour and desktop executable startup checks in Windows CI. File-dialog responses in interface tests use synthetic inputs. These checks do not cover every real modpack or Windows configuration.

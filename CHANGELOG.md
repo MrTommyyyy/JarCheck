@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Preview duplicate groups and choose which healthy copy to keep.
+- Recoverable cleanup with hash rechecks, a sibling backup folder and explicit restore.
+- Refuse changed files, unsafe paths and overwriting files during restoration.
+- Background cleanup and restore; narrow-window text wraps to fit.
+- Nine cleanup tests and four actual Tk interface tests.
+
 ## 0.3.0
 
 - Windows desktop and CLI executables; scan progress and clipboard results.

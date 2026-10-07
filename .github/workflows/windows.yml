@@ -35,20 +35,24 @@ jobs:
         shell: pwsh
         run: |
           $app = Start-Process .\dist\JarCheck.exe -PassThru
+          $window = $null
+          $candidateIds = @($app.Id)
           try {
             $timer = [Diagnostics.Stopwatch]::StartNew()
             do {
               Start-Sleep -Milliseconds 200
               $app.Refresh()
               if ($app.HasExited) { throw "Desktop exited before showing a window" }
-            } while ($app.MainWindowHandle -eq 0 -and $timer.Elapsed.TotalSeconds -lt 30)
-            if ($app.MainWindowHandle -eq 0 -or $app.MainWindowTitle -notlike '*JarCheck 0.4.0*') { throw "Desktop window was not detected" }
-            Write-Host "Packaged desktop opened: $($app.MainWindowTitle)"
+              # One-file bundles show their GUI in a child process.
+              $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($app.Id)" | Select-Object -ExpandProperty ProcessId)
+              $candidateIds = @($app.Id) + $children
+              $window = Get-Process -Id $candidateIds -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like '*JarCheck 0.4.0*' } | Select-Object -First 1
+            } while ($null -eq $window -and $timer.Elapsed.TotalSeconds -lt 30)
+            if ($null -eq $window) { throw "Desktop window was not detected in launcher or child process" }
+            Write-Host "Packaged desktop opened: $($window.MainWindowTitle)"
           } finally {
-            if (-not $app.HasExited) {
-              $null = $app.CloseMainWindow()
-              if (-not $app.WaitForExit(5000)) { $app.Kill() }
-            }
+            if ($null -ne $window -and -not $window.HasExited) { $null = $window.CloseMainWindow() }
+            if (-not $app.WaitForExit(5000)) { Stop-Process -Id $candidateIds -Force -ErrorAction SilentlyContinue }
           }
       - name: Package portable download
         shell: pwsh

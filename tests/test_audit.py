@@ -74,6 +74,20 @@ class AuditTests(unittest.TestCase):
         self.assertIn("0 JAR", summary(audit(self.folder)))
         self.assertIn("No JAR files found", summary(audit(self.folder)))
 
+    def test_progress_counts_nested_invalid_and_duplicate_files(self):
+        self.jar("a.jar")
+        (self.folder / "nested").mkdir()
+        (self.folder / "nested" / "bad.jar").write_bytes(b"bad")
+        events = []
+        report = audit(self.folder, recursive=True, progress=lambda *event: events.append(event))
+        self.assertEqual(len(report["files"]), 2)
+        self.assertEqual(events, [(0, 2, "a.jar"), (1, 2, "nested/bad.jar"), (2, 2, "")])
+
+    def test_empty_folder_progress_completes(self):
+        events = []
+        audit(self.folder, progress=lambda *event: events.append(event))
+        self.assertEqual(events, [(0, 0, "")])
+
     def test_missing_folder(self):
         with self.assertRaises(ValueError):
             audit(self.folder / "missing")

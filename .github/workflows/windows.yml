@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+concurrency:
+  group: windows-release
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -25,30 +28,49 @@ jobs:
         shell: pwsh
         run: |
           $actual = & .\dist\JarCheck-CLI.exe --version
-          if ($LASTEXITCODE -ne 0 -or $actual -ne '0.3.0') { throw "Wrong bundled version: $actual" }
+          if ($LASTEXITCODE -ne 0 -or $actual -ne '0.4.0') { throw "Wrong bundled version: $actual" }
       - name: Test packaged behaviour
         run: python windows_smoke.py
+      - name: Check packaged desktop startup
+        shell: pwsh
+        run: |
+          $app = Start-Process .\dist\JarCheck.exe -PassThru
+          try {
+            $timer = [Diagnostics.Stopwatch]::StartNew()
+            do {
+              Start-Sleep -Milliseconds 200
+              $app.Refresh()
+              if ($app.HasExited) { throw "Desktop exited before showing a window" }
+            } while ($app.MainWindowHandle -eq 0 -and $timer.Elapsed.TotalSeconds -lt 30)
+            if ($app.MainWindowHandle -eq 0 -or $app.MainWindowTitle -notlike '*JarCheck 0.4.0*') { throw "Desktop window was not detected" }
+            Write-Host "Packaged desktop opened: $($app.MainWindowTitle)"
+          } finally {
+            if (-not $app.HasExited) {
+              $null = $app.CloseMainWindow()
+              if (-not $app.WaitForExit(5000)) { $app.Kill() }
+            }
+          }
       - name: Package portable download
         shell: pwsh
         run: |
           Copy-Item LICENSE, WINDOWS-README.txt -Destination dist
           Get-ChildItem dist\*.exe | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content -Encoding ascii dist\SHA256SUMS.txt
-          Compress-Archive -Path dist\* -DestinationPath JarCheck-0.3.0-Windows-x64.zip
+          Compress-Archive -Path dist\* -DestinationPath JarCheck-0.4.0-Windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: JarCheck-0.3.0-Windows-x64
-          path: JarCheck-0.3.0-Windows-x64.zip
+          name: JarCheck-0.4.0-Windows-x64
+          path: JarCheck-0.4.0-Windows-x64.zip
           if-no-files-found: error
       - name: Publish tested release downloads
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python package_source.py JarCheck 0.3.0
-          gh release view v0.3.0 --repo ${{ github.repository }} *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create v0.3.0 --repo ${{ github.repository }} --target ${{ github.sha }} --title "JarCheck 0.3.0" --notes-file RELEASE-NOTES.md --latest
-            if ($LASTEXITCODE -ne 0) { throw "Release creation failed" }
+          python package_source.py JarCheck 0.4.0
+          gh release view v0.4.0 --repo ${{ github.repository }} *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release v0.4.0 already exists; preserving published downloads."
+            exit 0
           }
-          gh release upload v0.3.0 JarCheck-0.3.0-Windows-x64.zip JarCheck-0.3.0-Source.zip --repo ${{ github.repository }} --clobber
-          if ($LASTEXITCODE -ne 0) { throw "Release upload failed" }
+          gh release create v0.4.0 JarCheck-0.4.0-Windows-x64.zip JarCheck-0.4.0-Source.zip --repo ${{ github.repository }} --target ${{ github.sha }} --title "JarCheck 0.4.0" --notes-file RELEASE-NOTES.md --latest
+          if ($LASTEXITCODE -ne 0) { throw "Release publication failed" }

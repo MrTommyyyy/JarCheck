@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Windows desktop and CLI executables; scan progress and clipboard results.
+- Added regression tests for the new behaviour.
+
 ## 0.2.0
 
 - Opt-in recursive scans with relative paths and no symbolic-link traversal.

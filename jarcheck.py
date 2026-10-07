@@ -10,12 +10,12 @@ import zipfile
 from collections import defaultdict
 from pathlib import Path
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 MAX_UNPACKED_BYTES = 128 * 1024 * 1024
 MAX_ENTRIES = 10_000
 
 
-def audit(folder: str | Path, *, recursive: bool = False) -> dict:
+def audit(folder: str | Path, *, recursive: bool = False, progress=None) -> dict:
     """Inspect JARs without changing them. Never follow symbolic links."""
     folder = Path(folder)
     if not folder.is_dir():
@@ -33,7 +33,11 @@ def audit(folder: str | Path, *, recursive: bool = False) -> dict:
             for name in names:
                 yield Path(parent) / name
 
-    for path in sorted(candidates(), key=lambda p: (p.relative_to(folder).as_posix().casefold(), p.relative_to(folder).as_posix())):
+    paths = [p for p in candidates() if p.suffix.lower() == ".jar" and (p.is_symlink() or p.is_file())]
+    paths.sort(key=lambda p: (p.relative_to(folder).as_posix().casefold(), p.relative_to(folder).as_posix()))
+    for index, path in enumerate(paths):
+        if progress is not None:
+            progress(index, len(paths), path.relative_to(folder).as_posix())
         if path.suffix.lower() != ".jar":
             continue
         name = path.relative_to(folder).as_posix()
@@ -75,6 +79,8 @@ def audit(folder: str | Path, *, recursive: bool = False) -> dict:
                 record.pop("sha256", None)
             elif digest is not None:
                 hashes[digest].append(name)
+    if progress is not None:
+        progress(len(paths), len(paths), "")
     return {
         "tool": "JarCheck", "version": VERSION,
         "files": records, "recursive": recursive,

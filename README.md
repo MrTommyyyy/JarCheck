@@ -2,13 +2,13 @@
 
 A small, offline Minecraft mod-folder checker. It finds **byte-for-byte identical JARs**, even when their names differ, and validates ZIP/JAR integrity. It never deletes, edits, or executes mods. No API key, subscription, or external Python packages required.
 
-Version: **0.2.0**. This project is at an early stage.
+Version: **0.3.0**. This project is at an early stage.
 
 [Download the latest release](https://github.com/MrTommyyyy/JarCheck/releases/latest) · [Report a bug](https://github.com/MrTommyyyy/JarCheck/issues/new?template=bug_report.md) · [Suggest an improvement](https://github.com/MrTommyyyy/JarCheck/issues/new?template=feature_request.md)
 
 ![Tests](https://github.com/MrTommyyyy/JarCheck/actions/workflows/tests.yml/badge.svg)
 
-**Download format:** a ZIP containing Python source, a desktop interface and a Windows launcher. Python 3.11+ is required; this is not a standalone EXE.
+**Windows download:** choose the `Windows-x64.zip` asset, extract it, and double-click `JarCheck.exe`. Python is bundled. `JarCheck-CLI.exe` is also included. The separate source ZIP is for Python users on Windows, macOS or Linux.
 
 ## Why I'm building this
 
@@ -25,6 +25,12 @@ I enjoy modded Minecraft and want tools that make managing modpacks less frustra
 - Optional subfolder scanning with relative paths; symbolic links are skipped.
 - Safe JSON exports from the terminal or desktop window.
 
+## Changes in 0.3.0
+
+- Portable Windows executables for the desktop window and command line.
+- Scan progress shows how many JARs have finished and the current filename.
+- Copy the readable results directly to your clipboard.
+
 ## Changes in 0.2.0
 
 - Added opt-in recursive scanning for packs that keep JARs in subfolders.
@@ -34,7 +40,7 @@ I enjoy modded Minecraft and want tools that make managing modpacks less frustra
 - Symbolic-link JARs are reported as skipped; symbolic-link directories are not traversed.
 - Added five regression tests and a synthetic demo you can try without a modpack.
 
-## Start on Windows
+## Start from Python source on Windows
 
 1. Install Python **3.11 or newer** from https://www.python.org/downloads/ and include the Python launcher. If offered, enable “Add Python to PATH”.
 2. Extract this entire ZIP into a folder.

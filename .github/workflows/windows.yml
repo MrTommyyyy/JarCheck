@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   windows:
     runs-on: windows-latest
@@ -16,7 +16,7 @@ jobs:
       - name: Test source
         run: python -m unittest discover -s tests -v
       - name: Install packaging tool
-        run: python -m pip install PyInstaller==6.16.0
+        run: python -m pip install PyInstaller==6.22.0
       - name: Build Windows executables
         run: |
           python -m PyInstaller --noconfirm --clean --onefile --noupx --windowed --name JarCheck gui.py
@@ -39,3 +39,16 @@ jobs:
           name: JarCheck-0.3.0-Windows-x64
           path: JarCheck-0.3.0-Windows-x64.zip
           if-no-files-found: error
+      - name: Publish tested release downloads
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python package_source.py JarCheck 0.3.0
+          gh release view v0.3.0 --repo ${{ github.repository }} *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create v0.3.0 --repo ${{ github.repository }} --target ${{ github.sha }} --title "JarCheck 0.3.0" --notes-file RELEASE-NOTES.md --latest
+            if ($LASTEXITCODE -ne 0) { throw "Release creation failed" }
+          }
+          gh release upload v0.3.0 JarCheck-0.3.0-Windows-x64.zip JarCheck-0.3.0-Source.zip --repo ${{ github.repository }} --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Release upload failed" }

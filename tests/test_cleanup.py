@@ -28,7 +28,7 @@ class CleanupTests(unittest.TestCase):
         self.assertEqual(result["moved"], ["a.jar"])
         self.assertEqual(sorted(p.name for p in self.folder.iterdir()), ["b.jar"])
         recovery = Path(result["recovery_folder"])
-        self.assertEqual(recovery.parent, self.parent / "JarCheck-Recovery")
+        self.assertEqual(recovery.parent, self.parent.resolve() / "JarCheck-Recovery")
         self.assertEqual((recovery / "a.jar").read_bytes(), original["a.jar"])
         self.assertEqual(restore_duplicates(recovery), ["a.jar"])
         self.assertEqual(original, {p.name: p.read_bytes() for p in self.folder.iterdir()})
